@@ -7,8 +7,9 @@ action_select(){
 3-) Disk Configuration
 4-) Format Disk Label
 5-) Install base packages
-6-) Chroot actions
-7-) Enter the command in Chroot system without Chroot"
+6-) Mount /boot/efi
+7-) Chroot actions
+8-) Enter the command in Chroot system without Chroot"
   read -p "Select action: " action_number
 }
 
@@ -109,118 +110,133 @@ then
   clear
   read -p "(Optional) Enter Extra packages (Default packages: base base-devel linux linux-headers linux-firmware git nano): " extra_packages
   pacstrap /mnt base base-devel linux linux-headers linux-firmware git nano $extra_packages
-  genfstab -U /mnt > /mnt/etc/fstab
-  
   action_select
 fi
 
+
 if [ $action_number == "6" ];
 then
+  read -p "UEFI/Legacy [U/L]: " genfstab_uefi
+  if [ $genfstab_uefi == "U" ];
+  then
+    mkdir /mnt/boot/efi
+    mount /dev/$boot_partition /mnt/boot/efi
+
+    genfstab -U /mnt > /mnt/etc/fstab
+  else
+    genfstab -U /mnt > /mnt/etc/fstab
+  fi
+  action_select
+fi
+
+
+if [ $action_number == "7" ];
+then
   arch_chroot(){
-    arch-chroot /mnt /bin/bash -c
+    arch-chroot /mnt /bin/bash
   }
 
-  arch_chroot "nano /etc/pacman.conf"
+  arch_chroot -c "nano /etc/pacman.conf"
 
   clear
 
   echo 'Example: Europe/Istanbul, Europe/Zurich, America/New_York'
   read -p 'Timezone: ' time_zone
 
-  arch_chroot "ln -sf /usr/share/zoneinfo/$time_zone"
-  arch_chroot "hwclock --systohc"
+  arch_chroot -c "ln -sf /usr/share/zoneinfo/$time_zone"
+  arch_chroot -c "hwclock --systohc"
 
   clear
 
   read -p "Select locale [en/tr]: " localeset
   if [ $localeset == "en" ];
   then
-    arch_chroot "echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen"
-    arch_chroot "locale-gen"
-    arch_chroot "touch /etc/locale.conf"
-    arch_chroot "echo 'LANG=en_US.UTF-8' >> /etc/locale.conf"
-    arch_chroot "touch /etc/vconsole.conf"
-    arch_chroot "echo 'KEYMAP=us' >> /etc/vconsole.conf"
+    arch_chroot -c "echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen"
+    arch_chroot -c "locale-gen"
+    arch_chroot -c "touch /etc/locale.conf"
+    arch_chroot -c "echo 'LANG=en_US.UTF-8' >> /etc/locale.conf"
+    arch_chroot -c "touch /etc/vconsole.conf"
+    arch_chroot -c "echo 'KEYMAP=us' >> /etc/vconsole.conf"
   else
-    arch_chroot "echo 'tr_TR.UTF-8 UTF-8' >> /etc/locale.gen"
-    arch_chroot "locale-gen"
-    arch_chroot "touch /etc/locale.conf"
-    arch_chroot "echo 'LANG=tr_TR.UTF-8' >> /etc/locale.conf"
-    arch_chroot "touch /etc/vconsole.conf"
-    arch_chroot "echo 'KEYMAP=trq' >> /etc/vconsole.conf"
+    arch_chroot -c "echo 'tr_TR.UTF-8 UTF-8' >> /etc/locale.gen"
+    arch_chroot -c "locale-gen"
+    arch_chroot -c "touch /etc/locale.conf"
+    arch_chroot -c "echo 'LANG=tr_TR.UTF-8' >> /etc/locale.conf"
+    arch_chroot -c "touch /etc/vconsole.conf"
+    arch_chroot -c "echo 'KEYMAP=trq' >> /etc/vconsole.conf"
   fi
-  
+
   clear
 
   read -p "Hostname: " host_name
-  arch_chroot "echo $host_name >> /etc/hostname"
-  
-  arch_chroot "echo '127.0.0.1       localhost' >> /etc/hosts"
-  arch_chroot "echo '::1             localhost' >> /etc/hosts"
-  arch_chroot "echo '127.0.1.1       '$host_name'.localdomain     '$host_name >> /etc/hosts"
+  arch_chroot -c "echo $host_name >> /etc/hostname"
+
+  arch_chroot -c "echo '127.0.0.1       localhost' >> /etc/hosts"
+  arch_chroot -c "echo '::1             localhost' >> /etc/hosts"
+  arch_chroot -c "echo '127.0.1.1       '$host_name'.localdomain     '$host_name >> /etc/hosts"
 
   clear
-  
+
   echo "Root password"
-  arch_chroot "passwd"
+  arch_chroot -c "passwd"
 
   clear
 
-  arch_chroot "pacman -Sy networkmanager"
-  arch_chroot "systemctl enable NetworkManager"
+  arch_chroot -c "pacman -Sy networkmanager"
+  arch_chroot -c "systemctl enable NetworkManager"
   sleep 2
   clear
 
-  arch_chroot "pacman -S xf86-input-libinput"
+  arch_chroot -c "pacman -S xf86-input-libinput"
   clear
 
-  arch_chroot "pacman -S ntfs-3g"
+  arch_chroot -c "pacman -S ntfs-3g"
   clear
 
   read -p "UEFI/Legacy [U/L]: " uefi_select
   if [ $uefi_select == "U" ];
   then
     clear
-    arch_chroot "pacman -S grub efibootmgr os-prober"
-    
+    arch_chroot -c "pacman -S grub efibootmgr os-prober"
+
     clear
-  
-    arch_chroot "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id='Arch Linux'"
+
+    arch_chroot -c "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id='Arch Linux'"
     sleep 1
     clear
 
-    arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
+    arch_chroot -c "grub-mkconfig -o /boot/grub/grub.cfg"
     sleep 2
     clear
   else
     clear
-    arch_chroot "pacman -S grub"
-    
+    arch_chroot -c "pacman -S grub"
+
     clear
-    
-    arch_chroot "grub-install /dev/$root_partition"
+
+    arch_chroot -c "grub-install /dev/$root_partition"
     sleep 1
     clear
 
-    arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
+    arch_chroot -c "grub-mkconfig -o /boot/grub/grub.cfg"
     sleep 2
     clear
   fi
 
   read -p "Username: " user_name
-  
-  arch_chroot "useradd -m -g users -G wheel,storage,power,audio,video,network -s /bin/bash $user_name"
+
+  arch_chroot -c "useradd -m -g users -G wheel,storage,power,audio,video,network -s /bin/bash $user_name"
   clear
 
   echo $user_name 'password'
-  arch_chroot "passwd $user_name"
+  arch_chroot -c "passwd $user_name"
 
-  arch_chroot "EDITOR=nano visudo"
+  arch_chroot -c "EDITOR=nano visudo"
   clear
   action_select
 fi
 
-if [ $action_number == "7" ];
+if [ $action_number == "8" ];
 then
   a=1
   while [ $a == "1" ];
