@@ -26,6 +26,7 @@ fi
 # Update Mirrors
 if [ $action_number == "2" ];
 then
+  clear
   pacman -Syy archlinux-keyring
   clear
   action_select
