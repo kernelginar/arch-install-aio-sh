@@ -179,6 +179,7 @@ then
 
   read -p "UEFI/Legacy [U/L]: " uefi_select
   if [ $uefi_select == "U" ];
+  then
     clear
     arch_chroot "pacman -S grub efibootmgr os-prober"
     
