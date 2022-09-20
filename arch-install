@@ -7,9 +7,10 @@ action_select(){
 3-) Disk Configuration
 4-) Format Disk Label
 5-) Install base packages
-6-) Mount /boot/efi
+6-) Mount /boot/efi (UEFI Only)
 7-) Chroot actions
-8-) Enter the command in Chroot system without Chroot"
+8-) Enter the command in Chroot system without Chroot
+9-) Chroot shell (Bash)"
   read -p "Select action: " action_number
 }
 
@@ -26,6 +27,7 @@ fi
 # Update Mirrors
 if [ $action_number == "2" ];
 then
+  clear
   pacman -Syy archlinux-keyring
   clear
   action_select
@@ -36,6 +38,7 @@ if [ $action_number == "3" ];
 then
   clear
   lsblk
+  echo " "
   read -p "Select disk (Example: vda, sda, nvme0n1): " disk_selection
   cfdisk /dev/$disk_selection
   action_select
@@ -109,6 +112,7 @@ if [ $action_number == "5" ];
 then
   clear
   read -p "(Optional) Enter Extra packages (Default packages: base base-devel linux linux-headers linux-firmware git nano): " extra_packages
+  clear
   pacstrap /mnt base base-devel linux linux-headers linux-firmware git nano $extra_packages
   action_select
 fi
@@ -212,7 +216,7 @@ then
 
     clear
 
-    $arch_chroot -c "grub-install /dev/$root_partition"
+    $arch_chroot -c "grub-install /dev/$disk_selection"
     sleep 1
     clear
 
@@ -243,3 +247,10 @@ then
     arch-chroot /mnt /bin/bash -c "$chroot_command"
   done
 fi
+
+if [ $action_number == "9" ];
+then
+  clear
+  arch-chroot /mnt /bin/bash
+  action_select
+ fi
