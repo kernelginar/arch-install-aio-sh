@@ -1,4 +1,4 @@
-# Arch Linux Installation script All In One
+# Arch Linux Installation All in One Bash Script
 
 ## Usage:
 
