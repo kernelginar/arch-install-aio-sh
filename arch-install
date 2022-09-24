@@ -108,6 +108,7 @@ then
   action_select
 fi
 
+# Install base packages
 if [ $action_number == "5" ];
 then
   clear
@@ -117,6 +118,7 @@ then
   action_select
 fi
 
+# Mount /boot/efi (UEFI Only)
 if [ $action_number == "6" ];
 then
   read -p "UEFI/Legacy [U/L]: " genfstab_uefi
@@ -132,15 +134,17 @@ then
   action_select
 fi
 
-
+# Chroot actions
 if [ $action_number == "7" ];
 then
   arch_chroot="arch-chroot /mnt /bin/bash"
-
+  
+  # Edit /etc/pacman.conf
   $arch_chroot -c "nano /etc/pacman.conf"
 
   clear
-
+  
+  # timezone
   echo 'Example: Europe/Istanbul, Europe/Zurich, America/New_York'
   read -p 'Timezone: ' time_zone
 
@@ -148,7 +152,8 @@ then
   $arch_chroot -c "hwclock --systohc"
 
   clear
-
+  
+  # Locale
   read -p "Select locale [en/tr]: " localeset
   if [ $localeset == "en" ];
   then
@@ -169,6 +174,7 @@ then
 
   clear
 
+  # hostname
   read -p "Hostname: " host_name
   $arch_chroot -c "echo $host_name >> /etc/hostname"
 
@@ -177,26 +183,33 @@ then
   $arch_chroot -c "echo '127.0.1.1       '$host_name'.localdomain     '$host_name >> /etc/hosts"
 
   clear
-
+  
+  # Root user password
   echo "Root password"
   $arch_chroot -c "passwd"
 
   clear
-
+  
+  # Network Manager
   $arch_chroot -c "pacman -Sy networkmanager"
   $arch_chroot -c "systemctl enable NetworkManager"
   sleep 2
   clear
 
+  # Touchpad support
   $arch_chroot -c "pacman -S xf86-input-libinput"
   clear
-
+  
+  # NTFS Filesystem support
   $arch_chroot -c "pacman -S ntfs-3g"
   clear
-
+  
+  # GRUB UEFI/legacy
   read -p "UEFI/Legacy [U/L]: " uefi_select
   if [ $uefi_select == "U" ];
   then
+
+    # UEFI
     clear
     $arch_chroot -c "pacman -S grub efibootmgr os-prober"
 
@@ -210,6 +223,8 @@ then
     sleep 2
     clear
   else
+
+    #Legacy
     clear
     $arch_chroot -c "pacman -S grub"
 
@@ -223,7 +238,8 @@ then
     sleep 2
     clear
   fi
-
+  
+  # Add user
   read -p "Username: " user_name
 
   $arch_chroot -c "useradd -m -g users -G wheel,storage,power,audio,video,network -s /bin/bash $user_name"
@@ -231,12 +247,14 @@ then
 
   echo $user_name 'password'
   $arch_chroot -c "passwd $user_name"
-
+  
+  # Sudo privileges
   $arch_chroot -c "EDITOR=nano visudo"
   clear
   action_select
 fi
 
+# Chroot commands without chroot shell
 if [ $action_number == "8" ];
 then
   a=1
@@ -247,6 +265,7 @@ then
   done
 fi
 
+# Enter chroot shell
 if [ $action_number == "9" ];
 then
   clear
