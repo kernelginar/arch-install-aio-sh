@@ -1,0 +1,209 @@
+#!/bin/bash
+
+action_select(){
+  clear
+  echo "1-) Edit /etc/pacman.conf file
+2-) Update Mirrors
+3-) Disk Configuration
+4-) Format Disk Label
+5-) Install base packages
+6-) Mount /boot/efi (For UEFI/Legacy)
+7-) Chroot actions
+8-) Chroot shell (Bash)
+9-) Exit"
+  read -p "Select action: " action_number
+}
+
+action_select
+
+# Edit /etc/pacman.conf file
+if [ $action_number == "1" ];
+then
+  nano /etc/pacman.conf
+  clear
+  action_select
+fi
+
+# Update Mirrors
+if [ $action_number == "2" ];
+then
+  clear
+  pacman -Syy archlinux-keyring
+  clear
+  action_select
+fi
+
+# Disk Configuration
+if [ $action_number == "3" ];
+then
+  clear
+  lsblk
+  echo " "
+  read -p "Select disk (Example: vda, sda, nvme0n1): " disk_selection
+  cfdisk /dev/$disk_selection
+  action_select
+fi
+
+# Format Disk Label
+if [ $action_number == "4" ];
+then
+  clear
+  lsblk
+  echo " "
+  
+  read -p "Select Root partition (Example: vda1, sda1, nvme0n1p1): " root_partition
+  mkfs.ext4 /dev/$root_partition
+  
+  mount /dev/$root_partition /mnt
+  echo "/dev/$root_partition mounted /mnt directory"
+  
+  read -p "Select Boot partition (Example: vda1, sda1, nvme0n1p1): " boot_partition
+  mkfs.fat -F32 /dev/$boot_partition
+
+  read -p "Select Swap partition (Example: vda1, sda1, nvme0n1p1): " swap_partition
+  mkswap /dev/$swap_partition
+  swapon /dev/$swap_partition
+
+  action_select
+fi
+
+# Install base packages
+if [ $action_number == "5" ];
+then
+  clear
+  read -p "(Optional) Enter Extra packages (Default packages: base base-devel linux linux-headers linux-firmware git nano): " extra_packages
+  
+  clear
+  pacstrap /mnt base base-devel linux linux-headers linux-firmware git nano $extra_packages
+  action_select
+fi
+
+# Mount /boot/efi (UEFI Only)
+if [ $action_number == "6" ];
+then
+  mkdir -p /mnt/boot/efi
+  echo "Created /mnt/boot/efi directory"
+
+  genfstab -U /mnt > /mnt/etc/fstab
+  echo "Fstab file generated in /mnt/etc/fstab"
+
+  mount /dev/$boot_partition /mnt/boot/efi
+  echo "Mounted $boot_partition /mnt/boot/efi"
+  sleep 1
+  action_select
+fi
+
+# Chroot actions
+if [ $action_number == "7" ];
+then
+
+  arch_chroot="arch-chroot /mnt /bin/bash"
+  
+  # Edit /etc/pacman.conf
+  $arch_chroot -c "nano /etc/pacman.conf"
+
+  clear
+  
+  # timezone
+  echo 'Example: Europe/Istanbul, Europe/Zurich, America/New_York'
+  read -p 'Timezone: ' time_zone
+
+  $arch_chroot -c "ln -sf /usr/share/zoneinfo/$time_zone /etc/localtime"
+  $arch_chroot -c "hwclock --systohc"
+
+  clear
+  
+  # Locale
+  read -p "Select locale [en/tr]: " localeset
+
+  if [ $localeset == "en" ];
+  then
+    $arch_chroot -c "echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen"
+    $arch_chroot -c "locale-gen"
+    $arch_chroot -c "touch /etc/locale.conf"
+    $arch_chroot -c "echo 'LANG=en_US.UTF-8' >> /etc/locale.conf"
+    $arch_chroot -c "touch /etc/vconsole.conf"
+    $arch_chroot -c "echo 'KEYMAP=us' >> /etc/vconsole.conf"
+  else
+    $arch_chroot -c "echo 'tr_TR.UTF-8 UTF-8' >> /etc/locale.gen"
+    $arch_chroot -c "locale-gen"
+    $arch_chroot -c "touch /etc/locale.conf"
+    $arch_chroot -c "echo 'LANG=tr_TR.UTF-8' >> /etc/locale.conf"
+    $arch_chroot -c "touch /etc/vconsole.conf"
+    $arch_chroot -c "echo 'KEYMAP=trq' >> /etc/vconsole.conf"
+  fi
+
+  clear
+
+  # hostname
+  read -p "Hostname: " host_name
+
+  $arch_chroot -c "echo $host_name >> /etc/hostname"
+
+  $arch_chroot -c "echo '127.0.0.1       localhost' >> /etc/hosts"
+  $arch_chroot -c "echo '::1             localhost' >> /etc/hosts"
+  $arch_chroot -c "echo '127.0.1.1       '$host_name'.localdomain     '$host_name >> /etc/hosts"
+
+  clear
+  
+  # Root user password
+  echo "Root password"
+  $arch_chroot -c "passwd"
+
+  clear
+  
+  # Network Manager
+  $arch_chroot -c "pacman -Sy networkmanager"
+  $arch_chroot -c "systemctl enable NetworkManager"
+  sleep 1
+  clear
+
+  # Touchpad support
+  $arch_chroot -c "pacman -S xf86-input-libinput"
+  clear
+  
+  # NTFS Filesystem support
+  $arch_chroot -c "pacman -S ntfs-3g"
+  clear
+  
+  # GRUB
+  $arch_chroot -c "pacman -S grub efibootmgr os-prober"
+  clear
+
+  $arch_chroot -c "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id='Arch Linux'"
+  sleep 1
+  clear
+
+  $arch_chroot -c "grub-mkconfig -o /boot/grub/grub.cfg"
+  clear
+  
+  # Add user
+  read -p "Username: " user_name
+
+  $arch_chroot -c "useradd -m -g users -G wheel,storage,power,audio,video,network -s /bin/bash $user_name"
+  clear
+
+  echo $user_name 'password'
+  $arch_chroot -c "passwd $user_name"
+  sleep 1
+
+  # Sudo privileges
+  $arch_chroot -c "EDITOR=nano visudo"
+  clear
+  action_select
+fi
+
+# Enter chroot shell
+if [ $action_number == "8" ];
+then
+  clear
+  arch-chroot /mnt /bin/bash
+  action_select
+fi
+
+# Exit
+if [ $action_number == "9" ];
+then
+  echo "All done!"
+  exit
+fi

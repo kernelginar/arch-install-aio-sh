@@ -7,10 +7,10 @@ action_select(){
 3-) Disk Configuration
 4-) Format Disk Label
 5-) Install base packages
-6-) Mount /boot/efi (UEFI Only)
+6-) Generate fstab file
 7-) Chroot actions
-8-) Enter the command in Chroot system without Chroot
-9-) Chroot shell (Bash)"
+8-) Chroot shell (Bash)
+9-) Exit"
   read -p "Select action: " action_number
 }
 
@@ -48,63 +48,15 @@ fi
 if [ $action_number == "4" ];
 then
   clear
-  read -p "UEFI/Legacy [U/L]: " uefi_legacy
-  if [ $uefi_legacy == "U" ];
-  then
-    clear
-    read -p "Have you created a Swap partition? [Y/N]: " swap_label
+  lsblk
+  echo " "
+  
+  read -p "Select Root partition (Example: vda1, sda1, nvme0n1p1): " root_partition
+  mkfs.ext4 /dev/$root_partition
+  
+  mount /dev/$root_partition /mnt
+  echo "/dev/$root_partition mounted /mnt directory"
 
-    # UEFI
-    if [ $swap_label == "Y" ];
-    then
-      clear
-      lsblk
-      read -p "Select Root partition (Example: vda1, sda1, nvme0n1p1): " root_partition
-      mkfs.ext4 /dev/$root_partition
-      mount /dev/$root_partition /mnt
-      mkdir /mnt/boot/efi
-
-      read -p "Select Swap partition (Example: vda1, sda1, nvme0n1p1): " swap_partition
-      mkswap /dev/$swap_partition
-      swapon /dev/$swap_partition
-
-      read -p "Select Boot partition (Example: vda1, sda1, nvme0n1p1): " boot_partition
-      mkfs.fat -F32 /dev/$boot_partition
-    else
-      clear
-      lsblk
-      read -p "Select Root partition (Example: vda1, sda1, nvme0n1p1): " root_partition
-      mkfs.ext4 /dev/$root_partition
-      mount /dev/$root_partition /mnt
-      mkdir /mnt/boot/efi
-
-      read -p "Select Boot partition (Example: vda1, sda1, nvme0n1p1): " boot_partition
-      mkfs.fat -F32 /dev/$boot_partition
-    fi
-
-  # Legacy
-  else
-    clear
-    read -p "Have you created a Swap partition? [Y/N]: " swap_label
-    if [ $swap_label == "Y" ];
-    then
-      clear
-      lsblk
-      read -p "Select Root partition (Example: vda1, sda1, nvme0n1p1): " root_partition
-      mkfs.ext4 /dev/$root_partition
-      mount /dev/$root_partition /mnt
-
-      read -p "Select Swap partition (Example: vda1, sda1, nvme0n1p1): " swap_partition
-      mkswap /dev/$swap_partition
-      swapon /dev/$swap_partition
-    else
-      clear
-      lsblk
-      read -p "Select Root partition (Example: vda1, sda1, nvme0n1p1): " root_partition
-      mkfs.ext4 /dev/$root_partition
-      mount /dev/$root_partition /mnt
-    fi
-  fi
   action_select
 fi
 
@@ -113,30 +65,24 @@ if [ $action_number == "5" ];
 then
   clear
   read -p "(Optional) Enter Extra packages (Default packages: base base-devel linux linux-headers linux-firmware git nano): " extra_packages
+  
   clear
   pacstrap /mnt base base-devel linux linux-headers linux-firmware git nano $extra_packages
   action_select
 fi
 
-# Mount /boot/efi (UEFI Only)
+# Generate fstab file
 if [ $action_number == "6" ];
 then
-  read -p "UEFI/Legacy [U/L]: " genfstab_uefi
-  if [ $genfstab_uefi == "U" ];
-  then
-    mkdir /mnt/boot/efi
-    mount /dev/$boot_partition /mnt/boot/efi
-
-    genfstab -U /mnt > /mnt/etc/fstab
-  else
-    genfstab -U /mnt > /mnt/etc/fstab
-  fi
+  genfstab -U /mnt > /mnt/etc/fstab
+  echo "Fstab file generated in /mnt/etc/fstab"
   action_select
 fi
 
 # Chroot actions
 if [ $action_number == "7" ];
 then
+
   arch_chroot="arch-chroot /mnt /bin/bash"
   
   # Edit /etc/pacman.conf
@@ -148,13 +94,14 @@ then
   echo 'Example: Europe/Istanbul, Europe/Zurich, America/New_York'
   read -p 'Timezone: ' time_zone
 
-  $arch_chroot -c "ln -sf /usr/share/zoneinfo/$time_zone"
+  $arch_chroot -c "ln -sf /usr/share/zoneinfo/$time_zone /etc/localtime"
   $arch_chroot -c "hwclock --systohc"
 
   clear
   
   # Locale
   read -p "Select locale [en/tr]: " localeset
+
   if [ $localeset == "en" ];
   then
     $arch_chroot -c "echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen"
@@ -176,6 +123,7 @@ then
 
   # hostname
   read -p "Hostname: " host_name
+
   $arch_chroot -c "echo $host_name >> /etc/hostname"
 
   $arch_chroot -c "echo '127.0.0.1       localhost' >> /etc/hosts"
@@ -193,7 +141,7 @@ then
   # Network Manager
   $arch_chroot -c "pacman -Sy networkmanager"
   $arch_chroot -c "systemctl enable NetworkManager"
-  sleep 2
+  sleep 1
   clear
 
   # Touchpad support
@@ -204,40 +152,15 @@ then
   $arch_chroot -c "pacman -S ntfs-3g"
   clear
   
-  # GRUB UEFI/legacy
-  read -p "UEFI/Legacy [U/L]: " uefi_select
-  if [ $uefi_select == "U" ];
-  then
+  # GRUB
+  read -p "Select disk (Example: vda, sda, nvme0n1): " disk_selection
+  $arch_chroot -c "pacman -S grub"
+  clear
 
-    # UEFI
-    clear
-    $arch_chroot -c "pacman -S grub efibootmgr os-prober"
-
-    clear
-
-    $arch_chroot -c "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id='Arch Linux'"
-    sleep 1
-    clear
-
-    $arch_chroot -c "grub-mkconfig -o /boot/grub/grub.cfg"
-    sleep 2
-    clear
-  else
-
-    #Legacy
-    clear
-    $arch_chroot -c "pacman -S grub"
-
-    clear
-
-    $arch_chroot -c "grub-install /dev/$disk_selection"
-    sleep 1
-    clear
-
-    $arch_chroot -c "grub-mkconfig -o /boot/grub/grub.cfg"
-    sleep 2
-    clear
-  fi
+  $arch_chroot -c "grub-install --target=i386-pc /dev/$disk_selection"
+  $arch_chroot -c "grub-mkconfig -o /boot/grub/grub.cfg"
+  sleep 1
+  clear
   
   # Add user
   read -p "Username: " user_name
@@ -247,28 +170,25 @@ then
 
   echo $user_name 'password'
   $arch_chroot -c "passwd $user_name"
-  
+  sleep 1
+
   # Sudo privileges
   $arch_chroot -c "EDITOR=nano visudo"
   clear
   action_select
 fi
 
-# Chroot commands without chroot shell
-if [ $action_number == "8" ];
-then
-  a=1
-  while [ $a == "1" ];
-  do
-    read -p "chroot command> " chroot_command
-    arch-chroot /mnt /bin/bash -c "$chroot_command"
-  done
-fi
-
 # Enter chroot shell
-if [ $action_number == "9" ];
+if [ $action_number == "8" ];
 then
   clear
   arch-chroot /mnt /bin/bash
   action_select
- fi
+fi
+
+# Exit
+if [ $action_number == "9" ];
+then
+  echo "All done!"
+  exit
+fi
