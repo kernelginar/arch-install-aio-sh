@@ -9,5 +9,5 @@ cd ~/arch-install-aio-sh
 
 chmod +x arch-install-<option>
 
-./arch-install
+./arch-install-<option>
 ```
