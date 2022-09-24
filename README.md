@@ -7,7 +7,7 @@ git clone https://github.com/abdullah-rgb/arch-install-aio-sh ~/arch-install-aio
 
 cd ~/arch-install-aio-sh
 
-chmod +x arch-install
+chmod +x arch-install-<option>
 
 ./arch-install
 ```
