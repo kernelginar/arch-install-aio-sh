@@ -139,7 +139,7 @@ then
   
   # Root user password
   echo "Root password"
-  $arch_chroot -c "passwd"
+  $arch_chroot -c "passwd root"
   sleep 1
 
   clear
@@ -159,7 +159,7 @@ then
   clear
   
   # GRUB
-  read -p "Select disk (Example: vda, sda, nvme0n1): " disk_selection
+  read -p "Select disk for GRUB Installation (Example: vda, sda, nvme0n1): " disk_selection
   $arch_chroot -c "pacman -S grub"
   clear
 

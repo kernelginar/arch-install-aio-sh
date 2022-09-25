@@ -148,7 +148,8 @@ then
   
   # Root user password
   echo "Root password"
-  $arch_chroot -c "passwd"
+  $arch_chroot -c "passwd root"
+  sleep 1
 
   clear
   
